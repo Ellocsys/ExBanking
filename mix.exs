@@ -22,7 +22,7 @@ defmodule ExBanking.MixProject do
   defp deps do
     [
       {:decimal, "~> 1.8"},
-      {:propcheck, "~> 1.1", only: [:test, :dev]}
+      {:gen_stage, "~> 0.11"}
     ]
   end
 end
