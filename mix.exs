@@ -21,7 +21,8 @@ defmodule ExBanking.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:decimal, "~> 1.8"}
+      {:decimal, "~> 1.8"},
+      {:propcheck, "~> 1.1", only: [:test, :dev]}
     ]
   end
 end
