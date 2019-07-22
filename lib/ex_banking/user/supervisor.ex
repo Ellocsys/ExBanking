@@ -9,13 +9,12 @@ defmodule ExBanking.User.DynamicSupervisor do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
-  def create_user(user) when is_bitstring(user) do
-    case DynamicSupervisor.start_child(__MODULE__, {ExBanking.User, user}) do
+  def create_user(user) do
+    DynamicSupervisor.start_child(__MODULE__, {ExBanking.User, user})
+    |> case do
       {:ok, _pid} -> :ok
       {:error, {:already_started, _pid}} -> {:error, :user_already_exists}
       {:error, error} -> {:error, error}
     end
   end
-
-  def create_user(_user), do: {:error, :wrong_arguments}
 end
