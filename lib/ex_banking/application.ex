@@ -4,8 +4,6 @@ defmodule ExBanking.Application do
   def start(_, _) do
     children = [
       {Registry, name: ExBanking.User.Registry, keys: :unique},
-      {Task.Supervisor, name: ExBanking.Dispatcher.TaskSupervisor},
-      ExBanking.Dispatcher,
       ExBanking.User.DynamicSupervisor
     ]
 

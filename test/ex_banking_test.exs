@@ -11,18 +11,7 @@ defmodule ExBankingTest do
     :ok
   end
 
-  def clear_tasks(_context) do
-    ExBanking.Dispatcher.TaskSupervisor
-    |> Task.Supervisor.children()
-    |> IO.inspect()
-    |> Enum.map(fn pid ->
-      Task.Supervisor.terminate_child(ExBanking.Dispatcher.TaskSupervisor, pid)
-    end)
-
-    :ok
-  end
-
-  setup [:clear_tasks, :clear_users]
+  setup [:clear_users]
 
   describe "ExBanking.create_user/1" do
     setup do
@@ -121,25 +110,25 @@ defmodule ExBankingTest do
     test "", %{user: user, amount: amount, currency: currency} do
       assert :ok == ExBanking.create_user(user)
 
-      assert ExBanking.deposit(user, amount, currency) == {:ok, amount}
-      assert ExBanking.withdraw(user, amount, currency) == {:ok, 0}
+      assert {:ok, amount} == ExBanking.deposit(user, amount, currency)
+      assert {:ok, 0} == ExBanking.withdraw(user, amount, currency)
     end
 
     test "with issuficient balance", %{user: user, amount: amount, currency: currency} do
-      assert ExBanking.create_user(user) == :ok
-      assert ExBanking.withdraw(user, amount, currency) == {:error, :not_enough_money}
+      assert :ok == ExBanking.create_user(user)
+      assert {:error, :not_enough_money} == ExBanking.withdraw(user, amount, currency)
     end
 
     test "from not existing user", %{user: user, amount: amount, currency: currency} do
-      assert ExBanking.withdraw(user, amount, currency) == {:error, :user_does_not_exist}
+      assert {:error, :user_does_not_exist} == ExBanking.withdraw(user, amount, currency)
     end
 
     test "with wrong argument" do
-      assert ExBanking.withdraw(1, [], {}) == {:error, :wrong_arguments}
+      assert {:error, :wrong_arguments} == ExBanking.withdraw(1, [], {})
     end
 
     test "with zero amount", %{user: user, currency: currency} do
-      assert ExBanking.withdraw(user, 0, currency) == {:error, :wrong_arguments}
+      assert {:error, :wrong_arguments} == ExBanking.withdraw(user, 0, currency)
     end
   end
 
@@ -245,22 +234,11 @@ defmodule ExBankingTest do
       %{to_user: "Igor", from_user: "AnotherIgor", amount: 100, currency: "$"}
     end
 
-    test "for ExBanking.create_user/1", %{to_user: to_user} do
-      tasks =
-        for _ <- 0..10,
-            do: Task.async(fn -> {to_user, ExBanking.create_user(to_user)} end)
-
-      assert {:error, :too_many_requests_to_user} == ExBanking.create_user(to_user)
-
-      tasks
-      |> Enum.map(&Task.await/1)
-    end
-
     test "for ExBanking.deposit/2", %{from_user: from_user, amount: amount, currency: currency} do
       assert :ok == ExBanking.create_user(from_user)
 
       tasks =
-        for _ <- 0..10,
+        for _ <- 0..100,
             do: Task.async(fn -> {from_user, ExBanking.deposit(from_user, amount, currency)} end)
 
       assert {:error, :too_many_requests_to_user} ==
@@ -280,7 +258,7 @@ defmodule ExBankingTest do
       assert :ok == ExBanking.create_user(to_user)
 
       tasks =
-        for _ <- 0..10,
+        for _ <- 0..100,
             do: Task.async(fn -> {from_user, ExBanking.deposit(from_user, amount, currency)} end)
 
       assert {:error, :too_many_requests_to_sender} ==
@@ -302,7 +280,7 @@ defmodule ExBankingTest do
       ExBanking.deposit(from_user, amount, currency)
 
       tasks =
-        for _ <- 0..9,
+        for _ <- 0..100,
             do: Task.async(fn -> {to_user, ExBanking.deposit(to_user, amount, currency)} end)
 
       assert {:error, :too_many_requests_to_receiver} ==
