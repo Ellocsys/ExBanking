@@ -1,6 +1,6 @@
 defmodule ExBanking do
   @moduledoc """
-  Documentation for ExBanking.
+
   """
 
   @doc """

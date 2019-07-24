@@ -170,12 +170,12 @@ defmodule ExBankingTest do
       amount: amount,
       currency: currency
     } do
-      assert ExBanking.create_user(to_user) == :ok
+      assert :ok == ExBanking.create_user(to_user)
 
-      assert ExBanking.send(from_user, to_user, amount, currency) ==
-               {:error, :sender_does_not_exist}
+      assert {:error, :sender_does_not_exist} ==
+               ExBanking.send(from_user, to_user, amount, currency)
 
-      assert ExBanking.get_balance(to_user, currency) == amount
+      assert {:ok, 0} == ExBanking.get_balance(to_user, currency)
     end
 
     test "both user not exist", %{
@@ -184,15 +184,16 @@ defmodule ExBankingTest do
       amount: amount,
       currency: currency
     } do
-      assert ExBanking.send(from_user, to_user, amount, currency) == {:error, :wrong_arguments}
+      assert {:error, :sender_does_not_exist} ==
+               ExBanking.send(from_user, to_user, amount, currency)
     end
 
     test "yourself", %{from_user: from_user, amount: amount, currency: currency} do
       assert :ok == ExBanking.create_user(from_user)
 
-      assert ExBanking.deposit(from_user, amount, currency) == {:ok, amount}
+      assert {:ok, amount} == ExBanking.deposit(from_user, amount, currency)
 
-      assert ExBanking.send(from_user, from_user, amount, currency) == {:error, :wrong_arguments}
+      assert {:error, :wrong_arguments} == ExBanking.send(from_user, from_user, amount, currency)
     end
 
     test "from user with issuficient balance", %{
@@ -206,7 +207,7 @@ defmodule ExBankingTest do
 
       assert {:error, :not_enough_money} = ExBanking.send(from_user, to_user, amount, currency)
 
-      assert {:ok, amount} == ExBanking.get_balance(from_user, currency)
+      assert {:ok, 0} == ExBanking.get_balance(from_user, currency)
       assert {:ok, 0} == ExBanking.get_balance(to_user, currency)
     end
 
@@ -258,7 +259,7 @@ defmodule ExBankingTest do
       assert :ok == ExBanking.create_user(to_user)
 
       tasks =
-        for _ <- 0..100,
+        for _ <- 0..30,
             do: Task.async(fn -> {from_user, ExBanking.deposit(from_user, amount, currency)} end)
 
       assert {:error, :too_many_requests_to_sender} ==

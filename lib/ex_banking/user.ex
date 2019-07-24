@@ -35,34 +35,26 @@ defmodule ExBanking.User do
 
   def withdraw(_user, _amount, _currency), do: {:error, :wrong_arguments}
 
-  # def send(from_user, to_user, amount, currency)
-  #     when is_binary(from_user) and is_binary(to_user) and is_number(amount) and amount > 0 and
-  #            is_binary(currency) and from_user != to_user do
-
-  #             with [{from_user_pid, _from_user] <- lookup(from_user),
-  #             false <- from_user_pid |> queeue_overlimit?(),
-  #             [{to_user_pid, _to_user] <- lookup(to_user),
-  #             false <- to_user_pid |> queeue_overlimit?(),
-  #             {:ok, from_user_balance} <- withdraw(from_user, amount, currency),
-  #             {:ok, to_user_balance} <- deposit(to_user, amount, currency) do
-  #               {:ok, from_user_balance, to_user_balance}
-  #             else
-
-
-  #   case withdraw(from_user, amount, currency) do
-  #     {:error, :too_many_requests_to_user} -> {:error, :too_many_requests_to_sender}
-  #     {:error, :user_does_not_exist} -> {:error, :sender_does_not_exist}
-  #     {:error, _msg} = error_msg -> error_msg
-  #     withdraw_result -> withdraw_result
-  #   end
-
-  #   case deposit(to_user, amount, currency) do
-  #     {:error, :too_many_requests_to_user} -> {:error, :too_many_requests_to_receiver}
-  #     {:error, :user_does_not_exist} -> {:error, :receiver_does_not_exist}
-  #     {:error, _msg} = error_msg -> error_msg
-  #     deposit_result -> deposit_result
-  #   end
-  # end
+  def send(from_user, to_user, amount, currency)
+      when is_binary(from_user) and is_binary(to_user) and is_number(amount) and amount > 0 and
+             is_binary(currency) and from_user != to_user do
+    with {[{from_user_pid, _meta}], _from_user} <- {lookup(from_user), from_user},
+         {false, _from_user} <- {queeue_overlimit?(from_user_pid), from_user},
+         {[{to_user_pid, _meta}], _to_user} <- {lookup(to_user), to_user},
+         {false, _from_user} <- {queeue_overlimit?(to_user_pid), to_user},
+         {:ok, from_user_balance} <-
+           GenServer.call(name(from_user), [:user_withdraw, amount, currency]),
+         {:ok, to_user_balance} <-
+           GenServer.call(name(to_user), [:user_deposit, amount, currency]) do
+      {:ok, from_user_balance, to_user_balance}
+    else
+      {true, ^from_user} -> {:error, :too_many_requests_to_sender}
+      {[], ^from_user} -> {:error, :sender_does_not_exist}
+      {true, ^to_user} -> {:error, :too_many_requests_to_receiver}
+      {[], ^to_user} -> {:error, :receiver_does_not_exist}
+      {:error, _msg} = error_msg -> error_msg
+    end
+  end
 
   def send(_from_user, _to_user, _amount, _currency), do: {:error, :wrong_arguments}
 
@@ -72,7 +64,7 @@ defmodule ExBanking.User do
   defp lookup(user),
     do: Registry.lookup(ExBanking.User.Registry, user)
 
-  defp name(user), do: {:via, Registry, {ExBanking.User.Registry, user, user}}
+  defp name(user), do: {:via, Registry, {ExBanking.User.Registry, user}}
 
   def start_link(user) do
     GenServer.start_link(__MODULE__, [], name: name(user))
@@ -86,10 +78,10 @@ defmodule ExBanking.User do
 
   def handle_call([action | args], _from, state) do
     if queeue_overlimit?(self()) do
-        {:reply, {:error, :too_many_requests_to_user}, state}
+      {:reply, {:error, :too_many_requests_to_user}, state}
     else
-        apply(__MODULE__, action, [state | args])
-        |> Tuple.insert_at(0, :reply)
+      apply(__MODULE__, action, [state | args])
+      |> Tuple.insert_at(0, :reply)
     end
   end
 
