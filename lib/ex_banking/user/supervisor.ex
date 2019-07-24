@@ -9,6 +9,11 @@ defmodule ExBanking.User.DynamicSupervisor do
     DynamicSupervisor.init(strategy: :one_for_one)
   end
 
+  @doc """
+  Create user function. 
+  Verify that the username valid 
+  And creates a user process if it can
+  """
   def create_user(user) when is_binary(user) do
     DynamicSupervisor.start_child(__MODULE__, {ExBanking.User, user})
     |> case do

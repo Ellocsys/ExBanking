@@ -8,6 +8,8 @@ defmodule ExBankingTest do
       DynamicSupervisor.terminate_child(ExBanking.User.DynamicSupervisor, pid)
     end)
 
+    # Process.sleep(1)
+
     :ok
   end
 
@@ -238,9 +240,14 @@ defmodule ExBankingTest do
     test "for ExBanking.deposit/2", %{from_user: from_user, amount: amount, currency: currency} do
       assert :ok == ExBanking.create_user(from_user)
 
+      [{pid, _}] = ExBanking.User.lookup(from_user)
+      :sys.suspend(pid)
+
       tasks =
-        for _ <- 0..100,
+        for _ <- 0..50,
             do: Task.async(fn -> {from_user, ExBanking.deposit(from_user, amount, currency)} end)
+
+      :sys.resume(pid)
 
       assert {:error, :too_many_requests_to_user} ==
                ExBanking.deposit(from_user, amount, currency)
@@ -258,9 +265,14 @@ defmodule ExBankingTest do
       assert :ok == ExBanking.create_user(from_user)
       assert :ok == ExBanking.create_user(to_user)
 
+      [{pid, _}] = ExBanking.User.lookup(from_user)
+      :sys.suspend(pid)
+
       tasks =
-        for _ <- 0..30,
+        for _ <- 0..50,
             do: Task.async(fn -> {from_user, ExBanking.deposit(from_user, amount, currency)} end)
+
+      :sys.resume(pid)
 
       assert {:error, :too_many_requests_to_sender} ==
                ExBanking.send(from_user, to_user, amount, currency)
@@ -280,9 +292,14 @@ defmodule ExBankingTest do
 
       ExBanking.deposit(from_user, amount, currency)
 
+      [{pid, _}] = ExBanking.User.lookup(to_user)
+      :sys.suspend(pid)
+
       tasks =
-        for _ <- 0..100,
+        for _ <- 0..50,
             do: Task.async(fn -> {to_user, ExBanking.deposit(to_user, amount, currency)} end)
+
+      :sys.resume(pid)
 
       assert {:error, :too_many_requests_to_receiver} ==
                ExBanking.send(from_user, to_user, amount, currency)

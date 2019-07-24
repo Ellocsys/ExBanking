@@ -1,9 +1,21 @@
 defmodule ExBanking.User do
+  @moduledoc """
+  The module describes the behavior of the user. 
+  The procedure for each operation can be described as: 
+  -> validation of operation parameters (if not return :wrong_arguments) 
+  -> check that the user exists (if not return :user_does_not_exist) 
+  -> check that the user has less than 10 operations in the queue (if not, return :too_many_requests_to_user) 
+  -> performing the operation itself 
+  -> returning the result
+  """
   use GenServer
 
   @operations_limit 10
 
   def get_balance(user, currency) when is_binary(user) and is_binary(currency) do
+    # if alive?(user) ... 
+    # design could not be duplicated but made using macros, 
+    # but I believe that using them here will only increase the complexity without tangible gains
     if alive?(user) do
       GenServer.call(name(user), [:user_get_balance, currency])
     else
@@ -13,6 +25,11 @@ defmodule ExBanking.User do
 
   def get_balance(_user, _amount), do: {:error, :wrong_arguments}
 
+  @doc """
+  Deposit function. 
+  Verify that the username and currency are valid 
+  and that the amount is greater than 0 (it is meaningless to increase by 0)
+  """
   def deposit(user, amount, currency)
       when is_binary(user) and is_number(amount) and amount > 0 and is_binary(currency) do
     if alive?(user) do
@@ -24,6 +41,11 @@ defmodule ExBanking.User do
 
   def deposit(_user, _amount, _currency), do: {:error, :wrong_arguments}
 
+  @doc """
+  Withdraw function. 
+  Verify that the username and currency are valid 
+  and that the amount is greater than 0 (it is meaningless to increase by 0)
+  """
   def withdraw(user, amount, currency)
       when is_binary(user) and is_number(amount) and amount > 0 and is_binary(currency) do
     if alive?(user) do
@@ -35,9 +57,20 @@ defmodule ExBanking.User do
 
   def withdraw(_user, _amount, _currency), do: {:error, :wrong_arguments}
 
+  @doc """
+  Function to send money between users
+  On guard, we check that the name of the sender, recipient and currency are valid, 
+  that the transfer amount is greater than zero (because it makes no sense to transfer 0) 
+  and that the sender and recipient are not the same (because it is meaningless)
+  """
   def send(from_user, to_user, amount, currency)
       when is_binary(from_user) and is_binary(to_user) and is_number(amount) and amount > 0 and
              is_binary(currency) and from_user != to_user do
+    # I did not describe the case of rollback operations 
+    # because it is not needed here: 
+    # If both users exist, there is free space in the mailbox 
+    # and the sender managed to withdraw money, 
+    # then there is no reason why the operation could not be completed
     with {[{from_user_pid, _meta}], _from_user} <- {lookup(from_user), from_user},
          {false, _from_user} <- {queeue_overlimit?(from_user_pid), from_user},
          {[{to_user_pid, _meta}], _to_user} <- {lookup(to_user), to_user},
@@ -58,13 +91,24 @@ defmodule ExBanking.User do
 
   def send(_from_user, _to_user, _amount, _currency), do: {:error, :wrong_arguments}
 
-  defp alive?(user),
+  def alive?(user) when is_binary(user),
     do: [] != lookup(user)
 
-  defp lookup(user),
+  def lookup(user) when is_binary(user),
     do: Registry.lookup(ExBanking.User.Registry, user)
 
-  defp name(user), do: {:via, Registry, {ExBanking.User.Registry, user}}
+  def name(user) when is_binary(user), do: {:via, Registry, {ExBanking.User.Registry, user}}
+
+  @doc """
+  A function to test the ability of a process to accept another operation request. 
+  To do this, check the status of the process mailbox and the number of messages in it.
+  """
+  def queeue_overlimit?(pid) when is_pid(pid) do
+    pid
+    |> Process.info()
+    |> Keyword.fetch!(:message_queue_len)
+    |> Kernel.>=(@operations_limit)
+  end
 
   def start_link(user) do
     GenServer.start_link(__MODULE__, [], name: name(user))
@@ -85,13 +129,8 @@ defmodule ExBanking.User do
     end
   end
 
-  defp queeue_overlimit?(pid) do
-    pid
-    |> Process.info()
-    |> Keyword.fetch!(:message_queue_len)
-    |> Kernel.>=(@operations_limit)
-  end
-
+  # All functions of user_* should have been made private (but the apply/3 wouldn't work) 
+  # and without the user_ prefix (but then the name will overlap with api)
   def user_get_balance(state, currency) do
     balance =
       state
@@ -105,6 +144,7 @@ defmodule ExBanking.User do
   end
 
   def user_deposit(state, amount, currency) do
+    # In order not to suffer from rounding numbers, I will round them right away
     deposit = Decimal.cast(amount) |> Decimal.round(2)
 
     new_state =

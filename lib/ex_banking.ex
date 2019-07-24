@@ -1,18 +1,4 @@
 defmodule ExBanking do
-  @moduledoc """
-
-  """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> ExBanking.hello()
-      :world
-
-  """
-
   @type banking_error ::
           {:error,
            :wrong_arguments
