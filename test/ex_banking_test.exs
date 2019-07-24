@@ -8,7 +8,7 @@ defmodule ExBankingTest do
       DynamicSupervisor.terminate_child(ExBanking.User.DynamicSupervisor, pid)
     end)
 
-    # Process.sleep(1)
+    Process.sleep(1)
 
     :ok
   end
