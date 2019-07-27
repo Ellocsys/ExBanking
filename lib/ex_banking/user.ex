@@ -115,6 +115,7 @@ defmodule ExBanking.User do
   end
 
   def init(_) do
+    Decimal.set_context(%Decimal.Context{rounding: :down})
     state = %{accounts: %{}}
 
     {:ok, state}
