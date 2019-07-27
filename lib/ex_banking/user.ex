@@ -13,14 +13,7 @@ defmodule ExBanking.User do
   @operations_limit 10
 
   def get_balance(user, currency) when is_binary(user) and is_binary(currency) do
-    # if alive?(user) ... 
-    # design could not be duplicated but made using macros, 
-    # but I believe that using them here will only increase the complexity without tangible gains
-    if alive?(user) do
-      GenServer.call(name(user), [:user_get_balance, currency])
-    else
-      {:error, :user_does_not_exist}
-    end
+    maybe_call(user, [:user_get_balance, currency])
   end
 
   def get_balance(_user, _amount), do: {:error, :wrong_arguments}
@@ -32,11 +25,7 @@ defmodule ExBanking.User do
   """
   def deposit(user, amount, currency)
       when is_binary(user) and is_number(amount) and amount > 0 and is_binary(currency) do
-    if alive?(user) do
-      GenServer.call(name(user), [:user_deposit, amount, currency])
-    else
-      {:error, :user_does_not_exist}
-    end
+    maybe_call(user, [:user_deposit, amount, currency])
   end
 
   def deposit(_user, _amount, _currency), do: {:error, :wrong_arguments}
@@ -48,11 +37,7 @@ defmodule ExBanking.User do
   """
   def withdraw(user, amount, currency)
       when is_binary(user) and is_number(amount) and amount > 0 and is_binary(currency) do
-    if alive?(user) do
-      GenServer.call(name(user), [:user_withdraw, amount, currency])
-    else
-      {:error, :user_does_not_exist}
-    end
+    maybe_call(user, [:user_withdraw, amount, currency])
   end
 
   def withdraw(_user, _amount, _currency), do: {:error, :wrong_arguments}
@@ -91,9 +76,6 @@ defmodule ExBanking.User do
 
   def send(_from_user, _to_user, _amount, _currency), do: {:error, :wrong_arguments}
 
-  def alive?(user) when is_binary(user),
-    do: [] != lookup(user)
-
   def lookup(user) when is_binary(user),
     do: Registry.lookup(ExBanking.User.Registry, user)
 
@@ -110,6 +92,16 @@ defmodule ExBanking.User do
     |> Kernel.>=(@operations_limit)
   end
 
+  defp maybe_call(user, message) do
+    with [{pid, _meta}] <- lookup(user),
+         true <- queeue_overlimit?(pid) do
+      GenServer.call(name(user), message)
+    else
+      [] -> {:error, :user_does_not_exist}
+      false -> {:error, :too_many_requests_to_user}
+    end
+  end
+
   def start_link(user) do
     GenServer.start_link(__MODULE__, [], name: name(user))
   end
@@ -122,12 +114,8 @@ defmodule ExBanking.User do
   end
 
   def handle_call([action | args], _from, state) do
-    if queeue_overlimit?(self()) do
-      {:reply, {:error, :too_many_requests_to_user}, state}
-    else
-      apply(__MODULE__, action, [state | args])
-      |> Tuple.insert_at(0, :reply)
-    end
+    apply(__MODULE__, action, [state | args])
+    |> Tuple.insert_at(0, :reply)
   end
 
   # All functions of user_* should have been made private (but the apply/3 wouldn't work) 

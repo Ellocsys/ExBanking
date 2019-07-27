@@ -68,7 +68,6 @@ defmodule ExBankingTest do
       }
     end
 
-    @tag :fuck
     test "", %{user: user, float_amount: float_amount, currency: currency} do
       assert :ok == ExBanking.create_user(user)
 
@@ -108,7 +107,6 @@ defmodule ExBankingTest do
       %{user: "Igor", amount: 100, currency: "$"}
     end
 
-    @tag :fuck
     test "", %{user: user, amount: amount, currency: currency} do
       assert :ok == ExBanking.create_user(user)
 
